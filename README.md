@@ -134,6 +134,9 @@ This ensures proper attribution and reproducibility.
 - ✅ Only **publicly accessible datasets** are harvested  
 - 🚫 Restricted datasets (login or permission required) are **skipped automatically**  
 - 📜 All downloaded files retain their original licenses (CC‑BY, CC0, custom terms)  
-- 🧠 Users must comply with dataset‑specific licenses and citation requirements  
+- 🧠 Users must comply with dataset‑specific licenses and citation requirements
+-  
+---
 
-
+## 🙏 **Acknowledgments**
+I would like to express my sincere gratitude to **Prof. Dr. Dirk Riehle, M.B.A.** for providing me with the opportunity to work on this project and for his continuous guidance throughout its development. His insights, feedback, and support were invaluable in shaping the direction and quality of this work.

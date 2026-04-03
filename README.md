@@ -88,13 +88,6 @@ python pipeline.py --zenodo
 python pipeline.py --dans
 ```
 
-### 📈 Status
-```bash
-python pipeline.py --status
-```
-
----
-
 ## 🗃️ **6. Data Sources & Citation**
 
 QDArchive harvests publicly available research datasets from two major open‑science infrastructures:

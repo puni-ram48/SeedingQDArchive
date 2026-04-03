@@ -5,10 +5,6 @@ QDArchive is an automated data‑acquisition pipeline designed to identify, retr
 
 The pipeline adheres to a structured **five‑table data model**, enabling reproducible research, metadata standardization, and downstream analysis.
 
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/57cbe5f1-f3d3-434c-b64c-da8f2e7f8dae" />
-
-
-
 ## 2. System Overview  
 The pipeline is composed of modular components:
 
@@ -77,12 +73,7 @@ python pipeline.py --status
 
 ---
 
-## 6. Documentation  
-A comprehensive description of the architecture, metadata model, and repository‑specific logic is available in the project’s `/docs` directory.
-
----
-
-# 📚 7. Data Sources & Citation  
+# 6. Data Sources & Citation  
 QDArchive harvests publicly available research datasets from two major open‑science infrastructures:
 
 ### **Zenodo (CERN, OpenAIRE)**

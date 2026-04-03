@@ -5,6 +5,8 @@ QDArchive is an automated data‑acquisition pipeline designed to identify, retr
 
 The pipeline adheres to a structured **five‑table data model**, enabling reproducible research, metadata standardization, and downstream analysis.
 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/326aa06a-f1d5-4eac-95d2-e6e7a933af91" />
+
 <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/3eb89a5c-5d3b-45c7-b3c1-3d648bbe5f6e" />
 
 

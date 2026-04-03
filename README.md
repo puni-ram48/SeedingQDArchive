@@ -143,6 +143,4 @@ This ensures proper attribution and reproducibility.
 - 📜 All downloaded files retain their original licenses (CC‑BY, CC0, custom terms)  
 - 🧠 Users must comply with dataset‑specific licenses and citation requirements  
 
----
 
-Would you like me to make this version **dark‑theme compatible** (for GitHub’s dark mode) or **add section dividers** for even more visual polish?

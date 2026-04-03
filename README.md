@@ -5,33 +5,7 @@ QDArchive is an automated data‑acquisition pipeline designed to identify, retr
 
 The pipeline adheres to a structured **five‑table data model**, enabling reproducible research, metadata standardization, and downstream analysis.
 
----
-flowchart LR
-    A[📥 User Query Set<br/>Extensions · Tools · Languages] --> B[🔍 Pipeline Orchestrator<br/>pipeline.py]
-
-    B --> C1[🧭 Zenodo Harvester<br/>zenodo.py]
-    B --> C2[🧭 DANS Harvester<br/>dans.py]
-
-    %% Zenodo branch
-    C1 --> D1[📡 Query Zenodo API<br/>/api/records]
-    D1 --> E1[📝 Extract Metadata<br/>title · desc · DOI · version · creators]
-    E1 --> F1[🧪 Decision Algorithm<br/>QDA? · Skip? · Qualitative hints?]
-    F1 --> G1[⬇️ Download Files<br/>QDA → all · Qualitative → supporting]
-    G1 --> H1[🗂 Build File Records]
-
-    %% DANS branch
-    C2 --> D2[📡 Query DANS Dataverse<br/>5 Data Stations]
-    D2 --> E2[📝 Extract Metadata<br/>authors · contacts · keywords · license]
-    E2 --> F2[🧪 Decision Algorithm<br/>QDA? · Skip? · Qualitative hints?]
-    F2 --> G2[⬇️ Download Files<br/>with 403‑handling]
-    G2 --> H2[🗂 Build File Records]
-
-    %% Merge
-    H1 --> I[🧾 Normalize & Save<br/>SQLite 5‑Table Schema]
-    H2 --> I
-
-    I --> J[📊 CSV Export<br/>projects · files · keywords · persons · licenses]
-    I --> K[📁 Structured Downloads<br/>/downloads/repo/dataset_id]
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/3eb89a5c-5d3b-45c7-b3c1-3d648bbe5f6e" />
 
 
 ## 2. System Overview  

@@ -5,7 +5,6 @@ Usage:
   python pipeline.py                    ← run all repos
   python pipeline.py --zenodo           ← Continue Zenodo (German, Spanish, French, Portuguese)
   python pipeline.py --dans             ← Run DANS only
-  python pipeline.py --status           ← Show current status
 """
 
 import sys
@@ -21,7 +20,7 @@ from config import (
     QUERIES_NORWEGIAN, QUERIES_SPANISH, QUERIES_FRENCH, QUERIES_PORTUGUESE,
     DANS_QUERIES
 )
-from database import setup_database, print_summary, export_to_csv, get_connection
+from database import setup_database, print_summary, get_connection 
 from zenodo import search_zenodo
 from dans import run_dans_pipeline
 
@@ -53,9 +52,9 @@ def show_status(conn):
     
     # Zenodo status
     print("\n ZENODO (Repository ID: 1)")
-    cursor.execute("SELECT COUNT(*), SUM(has_qda_file) FROM projects WHERE repository_id = 1")
-    total, qda = cursor.fetchone()
-    print(f"   Projects: {total} ({qda} with QDA files)")
+    cursor.execute("SELECT COUNT(*) FROM projects WHERE repository_id = 1")
+    total = cursor.fetchone()[0]
+    print(f"   Projects: {total}")
     
     completed_zenodo = get_completed_queries(conn, 1)
     print(f"   Queries completed: {len(completed_zenodo)}")
@@ -81,9 +80,9 @@ def show_status(conn):
     
     # DANS status
     print("\n DANS (Repository ID: 5)")
-    cursor.execute("SELECT COUNT(*), SUM(has_qda_file) FROM projects WHERE repository_id = 5")
-    total, qda = cursor.fetchone()
-    print(f"   Projects: {total} ({qda} with QDA files)")
+    cursor.execute("SELECT COUNT(*) FROM projects WHERE repository_id = 5")
+    total = cursor.fetchone()[0]
+    print(f"   Projects: {total}")
     
     if total > 0:
         completed_dans = get_completed_queries(conn, 5)
@@ -91,20 +90,29 @@ def show_status(conn):
     else:
         print(f"   Status: NOT STARTED")
 
-    # File statistics
+    # File statistics - UPDATED for TEXT status values
     print("\n FILE STATISTICS")
     cursor.execute("""
         SELECT 
-            SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as downloaded,
-            SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) as too_large,
-            SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) as skipped,
-            SUM(CASE WHEN status = 3 THEN file_size ELSE 0 END)/1024/1024 as saved_mb
+            SUM(CASE WHEN status = 'SUCCEEDED' THEN 1 ELSE 0 END) as succeeded,
+            SUM(CASE WHEN status = 'FAILED_TOO_LARGE' THEN 1 ELSE 0 END) as too_large,
+            SUM(CASE WHEN status = 'FAILED_LOGIN_REQUIRED' THEN 1 ELSE 0 END) as login_required,
+            SUM(CASE WHEN status = 'FAILED_SERVER_UNRESPONSIVE' THEN 1 ELSE 0 END) as server_error,
+            COUNT(*) as total
         FROM files
     """)
-    downloaded, too_large, skipped, saved_mb = cursor.fetchone()
-    print(f"   Downloaded: {downloaded}")
-    print(f"   Too large (>100MB): {too_large} (saved {saved_mb:.0f}MB of downloads)")
-    print(f"   Skipped/Failed: {skipped}")
+    result = cursor.fetchone()
+    succeeded = result[0] or 0
+    too_large = result[1] or 0
+    login_required = result[2] or 0
+    server_error = result[3] or 0
+    total_files = result[4] or 0
+    
+    print(f"   SUCCEEDED:                    {succeeded}")
+    print(f"   FAILED_TOO_LARGE:             {too_large}")
+    print(f"   FAILED_LOGIN_REQUIRED:        {login_required}")
+    print(f"   FAILED_SERVER_UNRESPONSIVE:   {server_error}")
+    print(f"   Total files:                  {total_files}")
     
     print("\n" + "="*70)
 
@@ -213,12 +221,10 @@ def main():
         
     else:
         print("\nUsage:")
-        print("  python pipeline.py --status              ← Show current status")
         print("  python pipeline.py --zenodo-extensions   ← Run extension queries (highest priority)")
         print("  python pipeline.py --zenodo-german       ← Run German queries")
         print("  python pipeline.py --zenodo              ← Run all remaining Zenodo")
         print("  python pipeline.py --dans                ← Run DANS")
-        print("  python pipeline.py --ada                 ← Run ADA")
         conn.close()
         return
     
@@ -227,11 +233,6 @@ def main():
     print("FINAL STATUS")
     print("="*70)
     show_status(conn)
-    
-    print("\n" + "="*70)
-    print("EXPORTING TO CSV")
-    print("="*70)
-    export_to_csv(conn)
     
     conn.close()
     

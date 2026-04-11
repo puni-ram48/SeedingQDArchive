@@ -160,19 +160,22 @@ QUERIES_TOOLS = [
     "Transana", "f4analyse", "CAQDAS",
 ]
 
-# Pass 3 — Qualitative research method queries (English)
-QUERIES_ENGLISH = [
-    "interview transcript",
-    "qualitative research",
-    "qualitative data",
-    "focus group",
-    "ethnography",
-    "grounded theory",
-    "semi-structured interview",
-    "thematic analysis",
-    "narrative analysis",
-    "case study research",
-    "participant observation",
+# Pass 3 — High precision queries (target actual data files, not methodology papers)
+QUERIES_HIGH_PRECISION = [
+    # Transcript patterns
+    "interview_transcript",
+    "participant_interview",
+    "focus_group_transcript",
+    "oral_history_transcript",
+    # Data file patterns
+    "transcript_data",
+    "qualitative_data_archive",
+    "caqdas_project",
+    # Specific study types
+    "semi_structured_interview_data",
+    "narrative_interview_data",
+    "qualitative_interview_data",
+    "verbatim_transcript",
 ]
 
 # Pass 4 — German queries (Zenodo, DANS)
@@ -228,11 +231,11 @@ QUERIES_PORTUGUESE = [
     "análise temática",
 ]
 
-# Combined query list for Zenodo (all passes)
+# Combined query list for Zenodo (using high precision instead of broad English)
 ZENODO_QUERIES = (
     QUERIES_EXTENSIONS +
     QUERIES_TOOLS +
-    QUERIES_ENGLISH +
+    QUERIES_HIGH_PRECISION +
     QUERIES_GERMAN +
     QUERIES_SPANISH +
     QUERIES_FRENCH +
@@ -243,7 +246,7 @@ ZENODO_QUERIES = (
 DANS_QUERIES = (
     QUERIES_EXTENSIONS +
     QUERIES_TOOLS +
-    QUERIES_ENGLISH +
+    QUERIES_HIGH_PRECISION +
     QUERIES_GERMAN +
     QUERIES_DUTCH +
     QUERIES_NORWEGIAN

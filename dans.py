@@ -1,7 +1,7 @@
 """
 dans.py 
-DANS SSH Data Station scraper (Repository ID: 5)
-API: https://ssh.datastations.nl (Dataverse API)
+DANS Data Station scraper (Repository ID: 5)
+API: Dataverse API (https://ssh.datastations.nl, etc.)
 """
 
 import os
@@ -11,36 +11,44 @@ from datetime import datetime
 from config import (
     REPOSITORIES, DOWNLOAD_FOLDER,
     DANS_PAGE_SIZE, SLEEP_BETWEEN_PAGES, SLEEP_BETWEEN_QUERIES,
-    TARGET_EXTENSIONS, SUPPORTING_EXTENSIONS,
     DANS_TOKEN,
 )
 from database import save_project, project_exists
 from utils import (
     safe_filename, strip_html, is_qda_file, is_supporting_file,
-    has_qualitative_hints, should_skip_project_type,
-    download_file, fetch_with_retry, detect_language,
-    build_file_records, print_download_result
+    has_qualitative_hints, download_file, fetch_with_retry, detect_language,
+    build_file_records, print_download_result, should_download_dataset
 )
 
 # Repository config
-REPO        = REPOSITORIES["dans"]
-REPO_ID     = REPO["id"]
-REPO_URL    = REPO["url"]
+REPO = REPOSITORIES["dans"]
+REPO_ID = REPO["id"]
+REPO_URL = REPO["url"]
 REPO_FOLDER = REPO["folder"]
-STATIONS    = REPO["stations"]
+STATIONS = REPO["stations"]
 
 # Max consecutive 403 errors before skipping rest of dataset
 MAX_CONSECUTIVE_403 = 2
 
-# Headers
+
 def get_headers():
+    """Get HTTP headers for DANS Dataverse API requests."""
     headers = {"Accept": "application/json"}
     if DANS_TOKEN:
         headers["X-Dataverse-key"] = DANS_TOKEN
     return headers
 
+
 def extract_dans_persons(dataset):
-    """Extract persons from DANS Dataverse citation metadata"""
+    """
+    Extract persons from DANS Dataverse citation metadata.
+
+    Args:
+        dataset: DANS dataset dictionary
+
+    Returns:
+        List of person dicts with name and role
+    """
     persons = []
     try:
         fields = (dataset.get("latestVersion", {})
@@ -58,12 +66,21 @@ def extract_dans_persons(dataset):
                     name = entry.get("datasetContactName", {}).get("value", "")
                     if name:
                         persons.append({"name": name, "role": "UPLOADER"})
-    except:
+    except Exception:
         pass
     return persons
 
+
 def extract_dans_keywords(dataset):
-    """Extract keywords from DANS Dataverse metadata — stored as-is per meeting notes"""
+    """
+    Extract keywords from DANS Dataverse metadata.
+
+    Args:
+        dataset: DANS dataset dictionary
+
+    Returns:
+        List of keyword strings
+    """
     keywords = []
     try:
         fields = (dataset.get("latestVersion", {})
@@ -76,12 +93,23 @@ def extract_dans_keywords(dataset):
                     kw = entry.get("keywordValue", {}).get("value", "")
                     if kw:
                         keywords.append(kw)
-    except:
+    except Exception:
         pass
     return keywords
 
+
 def extract_dans_language(dataset, title="", description=""):
-    """Extract language from DANS metadata"""
+    """
+    Extract language from DANS metadata.
+
+    Args:
+        dataset: DANS dataset dictionary
+        title: Project title (fallback)
+        description: Project description (fallback)
+
+    Returns:
+        BCP 47 language code
+    """
     try:
         fields = (dataset.get("latestVersion", {})
                          .get("metadataBlocks", {})
@@ -93,23 +121,27 @@ def extract_dans_language(dataset, title="", description=""):
                     lang = entry if isinstance(entry, str) else entry.get("value", "")
                     if lang:
                         return lang
-    except:
+    except Exception:
         pass
     return detect_language(description, title)
+
 
 def process_dans_dataset(conn, item, query_string, processed_dois,
                          station_api, station_folder, station_name):
     """
-    Process one DANS dataset following the professor's algorithm:
-    1. If QDA file found → download everything
-    2. If skip type → skip
-    3. Else if qualitative hints → download supporting files
-    4. Else → skip
+    Process one DANS dataset with smart qualitative data detection.
 
-    Fixes:
-    - No empty folders: folder only created when a file actually downloads
-    - Skip after 2 consecutive 403 errors: avoids wasting time on
-      restricted collections like SMGI oral history
+    Only downloads if the dataset contains actual qualitative data
+    (transcripts, QDA files, etc.) rather than methodology papers.
+
+    Args:
+        conn: Database connection
+        item: DANS search result item
+        query_string: Search query that found this dataset
+        processed_dois: Set of already processed DOIs
+        station_api: API URL for the data station
+        station_folder: Folder name for the station
+        station_name: Human-readable station name
     """
     title = item.get("name", "Unknown")
     global_id = item.get("global_id", "")
@@ -164,7 +196,7 @@ def process_dans_dataset(conn, item, query_string, processed_dois,
 
         # Version
         version_number = str(dataset.get("latestVersion", {}).get("versionNumber", ""))
-        version_minor  = str(dataset.get("latestVersion", {}).get("versionMinorNumber", ""))
+        version_minor = str(dataset.get("latestVersion", {}).get("versionMinorNumber", ""))
         version = f"{version_number}.{version_minor}" if version_number else ""
 
         # Upload date
@@ -174,150 +206,155 @@ def process_dans_dataset(conn, item, query_string, processed_dois,
         # Project URL
         project_url = item.get("url", f"https://doi.org/{global_id}")
 
-        # Project folder — use dataset ID from global_id
-        dataset_id     = global_id.split(":")[-1].replace("/", "-")
+        # Project folder
+        dataset_id = global_id.split(":")[-1].replace("/", "-")
         project_folder = dataset_id
 
-        if not has_qda:
-            hint_text = f"{title} {description} " + " ".join(keywords)
-            if not has_qualitative_hints(hint_text):
-                return
+        # Prepare metadata for classifier
+        files_metadata = [{"filename": f.get("dataFile", {}).get("filename", "")} for f in files]
 
+        # Run classifier (in memory only, no DB changes)
+        should_download, reason, score = should_download_dataset(
+            title,
+            description,
+            files_metadata
+        )
+
+        # Print classification result
+        print(f"\n  Analyzing: {title[:70]}")
+        print(f"    Score: {score} | Decision: {'DOWNLOAD' if should_download else 'SKIP'}")
+        print(f"    Reason: {reason}")
+
+        # Skip if classifier says no and no QDA files
+        if not should_download and not has_qda:
+            return
+
+        # Determine what to download
+        if has_qda:
+            files_to_download = files
+            print(f"    QDA files: {len(qda_filenames)}")
+        elif should_download:
+            # Download supporting files only
             files_to_download = [
                 f for f in files
                 if is_supporting_file(f.get("dataFile", {}).get("filename", ""))
             ]
             if not files_to_download:
+                print(f"    No supporting files to download")
                 return
-
-            print(f"\n  Qualitative Dataset (no QDA): {title}")
+            print(f"    Supporting files: {len(files_to_download)}")
         else:
-            files_to_download = files
-            print(f"\n  DANS QDA Dataset: {title}")
-            print(f"     QDA files:   {qda_filenames}")
-            print(f"     All files:   {len(files)}")
+            return
 
-        # Build dataset path — but DO NOT create folder yet
-        # Folder will only be created when a file actually downloads successfully
+        # Build path
         dataset_path = os.path.join(
             DOWNLOAD_FOLDER, REPO_FOLDER, station_folder, project_folder
         )
 
-                # Download files 
-        download_complete    = True
+        # Download files
         consecutive_failures = 0
-        any_downloaded       = False
-        file_results = []  # NEW: Track each file's result
+        any_downloaded = False
+        file_results = []
 
         for file_info in files_to_download:
             filename = file_info.get("dataFile", {}).get("filename", "")
-            file_id  = file_info.get("dataFile", {}).get("id")
-            file_size = file_info.get("dataFile", {}).get("filesize", 0)  # NEW: Get size from DANS
-            
+            file_id = file_info.get("dataFile", {}).get("id")
+
             if not filename or not file_id:
                 continue
 
-            safe_name    = safe_filename(filename)
+            safe_name = safe_filename(filename)
             download_url = f"{station_api}/api/access/datafile/{file_id}"
-            filepath     = os.path.join(dataset_path, safe_name)
+            filepath = os.path.join(dataset_path, safe_name)
 
-            # download_file creates directory only when content is actually saved
             result = download_file(
                 download_url, filepath,
                 headers=get_headers(),
-                create_dir=True   # ← creates folder only on successful download
+                create_dir=True
             )
 
             print_download_result(filename, result)
 
-            # NEW: Track for database
             file_results.append({
                 "filename": filename,
-                "size": file_size,
                 "download_result": result
             })
 
             if result == "downloaded":
                 any_downloaded = True
-                consecutive_failures = 0  # reset on success
-
+                consecutive_failures = 0
             elif "403" in result:
                 consecutive_failures += 1
-                download_complete = False
-
-                # Skip rest of dataset after consecutive 403s
-                # This handles restricted collections like SMGI oral history
                 if consecutive_failures >= MAX_CONSECUTIVE_403:
-                    print(f"  {consecutive_failures} consecutive 403 errors"
-                          f" — collection appears fully restricted")
-                    print(f"  Skipping remaining files in this dataset")
-                    download_complete = False
+                    print(f"    {consecutive_failures} consecutive 403 errors - skipping remaining files")
                     break
-
             elif result.startswith("failed"):
-                download_complete = False
                 consecutive_failures = 0
 
-        # Only save to database if:
-        # 1. Files were successfully downloaded, OR
-        # 2. Dataset has QDA file records worth keeping in metadata
+        # Only save if something was downloaded
         if not any_downloaded and not has_qda:
-            # Nothing downloaded and no QDA files — skip saving to DB too
             return
 
-        # Build file records for ALL files (metadata only — not just downloaded)
-                # NEW: Build file records with metadata (including skipped reasons)
+        # Build file records
         file_records = build_file_records(file_results)
 
-        # Save to database
+        # Save to database (schema-compliant only)
         project_data = {
-            "query_string":                 query_string,
-            "repository_id":                REPO_ID,
-            "repository_url":               REPO_URL,
-            "project_url":                  project_url,
-            "version":                      version,
-            "title":                        title,
-            "description":                  description,
-            "language":                     language,
-            "doi":                          doi,
-            "upload_date":                  upload_date,
-            "download_date":                datetime.now().isoformat(),
-            "download_repository_folder":   f"{REPO_FOLDER}/{station_folder}",
-            "download_project_folder":      project_folder,
-            "download_version_folder":      version or None,
-            "download_method":              "API-CALL",
-            "has_qda_file":                 1 if has_qda else 0,
-            "download_complete":            1 if download_complete else 0,
-            "files":                        file_records,
-            "keywords":                     keywords,
-            "persons":                      persons,
-            "licenses":                     licenses,
+            "query_string": query_string,
+            "repository_id": REPO_ID,
+            "repository_url": REPO_URL,
+            "project_url": project_url,
+            "version": version,
+            "title": title,
+            "description": description,
+            "language": language,
+            "doi": doi,
+            "upload_date": upload_date,
+            "download_date": datetime.now().isoformat(),
+            "download_repository_folder": f"{REPO_FOLDER}/{station_folder}",
+            "download_project_folder": project_folder,
+            "download_version_folder": version or None,
+            "download_method": "API-CALL",
+            "files": file_records,
+            "keywords": keywords,
+            "persons": persons,
+            "licenses": licenses,
         }
 
         save_project(conn, project_data)
         processed_dois.add(global_id)
+        print(f"\n  Saved to database")
         time.sleep(0.5)
-            
 
     except Exception as e:
-        print(f" Error processing DANS dataset '{title}': {e}")
+        print(f"  Error processing DANS dataset '{title}': {e}")
 
 
 def search_dans(conn, query, processed_dois, station_api, station_folder, station_name):
-    """Search a specific DANS data station for a query"""
+    """
+    Search a specific DANS data station for a query.
+
+    Args:
+        conn: Database connection
+        query: Search query string
+        processed_dois: Set of already processed DOIs
+        station_api: API URL for the data station
+        station_folder: Folder name for the station
+        station_name: Human-readable station name
+    """
     print(f"\n{'='*60}")
     print(f"[{station_name}] Searching for '{query}'...")
     print(f"{'='*60}")
 
-    page          = 0
+    page = 0
     total_checked = 0
-    new_found     = 0
+    new_found = 0
 
     while True:
         params = {
-            "q":        query,
-            "type":     "dataset",
-            "start":    page * DANS_PAGE_SIZE,
+            "q": query,
+            "type": "dataset",
+            "start": page * DANS_PAGE_SIZE,
             "per_page": DANS_PAGE_SIZE,
         }
 
@@ -329,7 +366,7 @@ def search_dans(conn, query, processed_dois, station_api, station_folder, statio
         if response is None:
             break
 
-        data  = response.json()
+        data = response.json()
         items = data.get("data", {}).get("items", [])
         total = data.get("data", {}).get("total_count", 0)
 
@@ -355,20 +392,25 @@ def search_dans(conn, query, processed_dois, station_api, station_folder, statio
         time.sleep(SLEEP_BETWEEN_PAGES)
 
     print(f"\n  Finished '{query}' on {station_name}")
-    print(f"     Records checked:  {total_checked}")
-    print(f"     New projects:     {new_found}")
+    print(f"    Records checked: {total_checked}")
+    print(f"    New projects: {new_found}")
+
 
 def run_dans_pipeline(conn, queries, processed_dois):
     """
-    Run full DANS pipeline across ALL 5 data stations.
-    All stations use identical Dataverse API — just different URLs.
+    Run full DANS pipeline across all 5 data stations.
 
-    Stations by priority for QDA files:
-    1. SSH (Social Sciences & Humanities) — most relevant
-    2. Archaeology — some qualitative fieldwork
-    3. DataverseNL — mixed institutional data
-    4. Life Sciences — unlikely but possible
-    5. Physical & Technical Sciences — unlikely for QDA
+    Stations are processed in priority order:
+    1. SSH (Social Sciences & Humanities) - most relevant
+    2. Archaeology - some qualitative fieldwork
+    3. DataverseNL - mixed institutional data
+    4. Life Sciences - unlikely but possible
+    5. Physical & Technical Sciences - unlikely for QDA
+
+    Args:
+        conn: Database connection
+        queries: List of search queries to execute
+        processed_dois: Set of already processed DOIs
     """
     print("\n" + "="*60)
     print("DANS PIPELINE (Repository ID: 5)")
@@ -382,13 +424,13 @@ def run_dans_pipeline(conn, queries, processed_dois):
     )
 
     for station_key, station in sorted_stations:
-        station_api    = station["api"]
+        station_api = station["api"]
         station_folder = station["folder"]
-        station_name   = station["name"]
+        station_name = station["name"]
 
         print(f"\n{'─'*60}")
         print(f"Station: {station_name}")
-        print(f"URL:     {station_api}")
+        print(f"URL: {station_api}")
         print(f"{'─'*60}")
 
         for query in queries:
@@ -398,4 +440,4 @@ def run_dans_pipeline(conn, queries, processed_dois):
             )
             time.sleep(SLEEP_BETWEEN_QUERIES)
 
-    print(f"\n All DANS stations complete")
+    print(f"\n  All DANS stations complete")

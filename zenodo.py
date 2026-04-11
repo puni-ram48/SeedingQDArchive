@@ -1,7 +1,7 @@
 """
 zenodo.py 
 Zenodo repository scraper (Repository ID: 1)
-API: https://zenodo.org/api/records 
+API: https://zenodo.org/api/records
 """
 
 import os
@@ -12,7 +12,6 @@ from config import (
     REPOSITORIES, DOWNLOAD_FOLDER,
     ZENODO_PAGE_SIZE, ZENODO_MAX_PAGES,
     SLEEP_BETWEEN_PAGES, SLEEP_BETWEEN_QUERIES,
-    TARGET_EXTENSIONS, SUPPORTING_EXTENSIONS,
     ZENODO_TOKEN,
 )
 from database import save_project, project_exists
@@ -20,31 +19,43 @@ from utils import (
     safe_filename, strip_html, is_qda_file, is_supporting_file,
     has_qualitative_hints, should_skip_project_type,
     download_file, fetch_with_retry, detect_language,
-    build_file_records, print_download_result
+    build_file_records, print_download_result, should_download_dataset
 )
 
 # Repository config
-REPO        = REPOSITORIES["zenodo"]
-REPO_ID     = REPO["id"]
-REPO_URL    = REPO["url"]
-REPO_API    = REPO["api"]
+REPO = REPOSITORIES["zenodo"]
+REPO_ID = REPO["id"]
+REPO_URL = REPO["url"]
+REPO_API = REPO["api"]
 REPO_FOLDER = REPO["folder"]
 
+
 def get_headers():
+    """Get HTTP headers for Zenodo API requests."""
     headers = {"Accept": "application/json"}
     if ZENODO_TOKEN:
         headers["Authorization"] = f"Bearer {ZENODO_TOKEN}"
+        print("  Using Zenodo API token for authenticated requests")
     return headers
 
+
 def extract_zenodo_metadata(record):
-    """Extract all metadata fields from a Zenodo API record"""
-    metadata  = record.get("metadata", {})
+    """
+    Extract all metadata fields from a Zenodo API record.
+
+    Args:
+        record: Zenodo API record dictionary
+
+    Returns:
+        Dictionary containing extracted metadata
+    """
+    metadata = record.get("metadata", {})
     record_id = str(record.get("id", ""))
 
-    title       = metadata.get("title", "Unknown")
+    title = metadata.get("title", "Unknown")
     description = strip_html(metadata.get("description", ""))
 
-    # DOI — prefer concept DOI (always points to latest version)
+    # DOI - prefer concept DOI (always points to latest version)
     concept_doi = record.get("conceptdoi", "")
     version_doi = record.get("doi", "") or metadata.get("doi", "")
     if concept_doi:
@@ -54,17 +65,17 @@ def extract_zenodo_metadata(record):
     else:
         doi = ""
 
-    version     = metadata.get("version", "")
+    version = metadata.get("version", "")
     upload_date = metadata.get("publication_date", "")
-    lang_raw    = metadata.get("language", "") or detect_language(description, title)
+    lang_raw = metadata.get("language", "") or detect_language(description, title)
 
-    # Keywords — stored 
+    # Keywords
     keywords_raw = metadata.get("keywords", [])
-    keywords     = keywords_raw if isinstance(keywords_raw, list) else []
+    keywords = keywords_raw if isinstance(keywords_raw, list) else []
 
-    # Persons — creators as AUTHOR
+    # Persons - creators as AUTHOR
     creators = metadata.get("creators", [])
-    persons  = [
+    persons = [
         {"name": c.get("name", ""), "role": "AUTHOR"}
         for c in creators if c.get("name")
     ]
@@ -72,44 +83,49 @@ def extract_zenodo_metadata(record):
     # License
     license_raw = metadata.get("license", {})
     license_str = license_raw.get("id", "") if isinstance(license_raw, dict) else str(license_raw or "")
-    licenses    = [license_str] if license_str else []
+    licenses = [license_str] if license_str else []
 
     # Resource type
     resource_type = metadata.get("resource_type", {}).get("type", "dataset")
 
     return {
-        "record_id":     record_id,
-        "title":         title,
-        "description":   description,
-        "doi":           doi,
-        "version":       version,
-        "upload_date":   upload_date,
-        "language":      lang_raw,
-        "keywords":      keywords,
-        "persons":       persons,
-        "licenses":      licenses,
+        "record_id": record_id,
+        "title": title,
+        "description": description,
+        "doi": doi,
+        "version": version,
+        "upload_date": upload_date,
+        "language": lang_raw,
+        "keywords": keywords,
+        "persons": persons,
+        "licenses": licenses,
         "resource_type": resource_type,
-        "project_url":   f"{REPO_URL}/records/{record_id}",
+        "project_url": f"{REPO_URL}/records/{record_id}",
     }
-    
+
+
 def process_record(conn, record, query_string, processed_dois):
     """
-    Process one Zenodo record following the professor's algorithm:
-    1. If QDA file found → download everything
-    2. If skip type → skip
-    3. Else if qualitative hints → download supporting files
-    4. Else → skip
+    Process one Zenodo record with smart qualitative data detection.
 
-    Fix: folder only created when a file actually downloads successfully
+    Only downloads if the dataset contains actual qualitative data
+    (transcripts, QDA files, etc.) rather than methodology papers.
+
+    Args:
+        conn: Database connection
+        record: Zenodo API record
+        query_string: Search query that found this record
+        processed_dois: Set of already processed DOIs
     """
     files = record.get("files", [])
     if not files:
         return
 
-    meta      = extract_zenodo_metadata(record)
+    meta = extract_zenodo_metadata(record)
     record_id = meta["record_id"]
-    doi       = meta["doi"] or record_id
+    doi = meta["doi"] or record_id
 
+    # Check if already processed
     if doi in processed_dois:
         return
 
@@ -118,54 +134,63 @@ def process_record(conn, record, query_string, processed_dois):
         processed_dois.add(doi)
         return
 
-    # Classify files
+    # Check for QDA files
     qda_files = [f for f in files if is_qda_file(f.get("key", ""))]
-    has_qda   = len(qda_files) > 0
+    has_qda = len(qda_files) > 0
 
-    if not has_qda:
-        if should_skip_project_type(meta["resource_type"]):
-            return
+    # Prepare metadata for classifier
+    files_metadata = [{"filename": f.get("key", "")} for f in files]
 
-        hint_text = f"{meta['title']} {meta['description']} " + " ".join(meta["keywords"])
-        if not has_qualitative_hints(hint_text):
-            return
+    # Run classifier (in memory only, no DB changes)
+    should_download, reason, score = should_download_dataset(
+        meta['title'],
+        meta['description'],
+        files_metadata
+    )
 
+    # Print classification result
+    print(f"\n  Analyzing: {meta['title'][:70]}")
+    print(f"    Score: {score} | Decision: {'DOWNLOAD' if should_download else 'SKIP'}")
+    print(f"    Reason: {reason}")
+
+    # Skip if classifier says no and no QDA files
+    if not should_download and not has_qda:
+        return
+
+    # Determine what to download
+    if has_qda:
+        files_to_download = files
+        print(f"    QDA files: {len(qda_files)}")
+    elif should_download:
+        # Download supporting files only
         files_to_download = [
             f for f in files if is_supporting_file(f.get("key", ""))
         ]
         if not files_to_download:
+            print(f"    No supporting files to download")
             return
-
-        print(f"\n  Qualitative Dataset (no QDA): {meta['title']}")
+        print(f"    Supporting files: {len(files_to_download)}")
     else:
-        files_to_download = files
-        print(f"\n QDA Dataset: {meta['title']}")
-        print(f"License:     {meta['licenses']}")
-        print(f"QDA files:   {[f['key'] for f in qda_files]}")
-        print(f"All files:   {len(files)}")
+        return
 
-        # Build path — DO NOT create folder yet
-    # Folder only created when a file actually downloads successfully
+    # Build path
     project_folder = record_id
-    dataset_path   = os.path.join(DOWNLOAD_FOLDER, REPO_FOLDER, project_folder)
+    dataset_path = os.path.join(DOWNLOAD_FOLDER, REPO_FOLDER, project_folder)
 
-    # Download files and track results
-    download_complete = True
-    any_downloaded    = False
-    file_results = []  # NEW: Track each file's result
+    # Download files
+    any_downloaded = False
+    file_results = []
 
     for file_info in files_to_download:
         filename = file_info.get("key", "")
         file_url = file_info.get("links", {}).get("self", "")
-        file_size = file_info.get("size", 0)  # NEW: Get size from Zenodo
-        
+
         if not filename or not file_url:
             continue
 
         safe_name = safe_filename(filename)
-        filepath  = os.path.join(dataset_path, safe_name)
+        filepath = os.path.join(dataset_path, safe_name)
 
-        # create_dir=True means folder is only created when content is saved
         result = download_file(
             file_url, filepath,
             headers=get_headers(),
@@ -173,72 +198,74 @@ def process_record(conn, record, query_string, processed_dois):
         )
         print_download_result(filename, result)
 
-        # NEW: Track result for database
         file_results.append({
             "filename": filename,
-            "size": file_size,
             "download_result": result
         })
 
         if result == "downloaded":
             any_downloaded = True
-        elif result.startswith("failed"):
-            download_complete = False
 
-    # Skip saving to DB if nothing was downloaded and no QDA metadata to keep
+    # Only save to database if something was downloaded
     if not any_downloaded and not has_qda:
         return
 
-    # Build file records for ALL files
-    all_filenames = [f.get("key", "") for f in files]
+    # Build file records
     file_records = build_file_records(file_results)
 
-    # Save to database
+    # Save to database (schema-compliant only)
     project_data = {
-        "query_string":                 query_string,
-        "repository_id":                REPO_ID,
-        "repository_url":               REPO_URL,
-        "project_url":                  meta["project_url"],
-        "version":                      meta["version"],
-        "title":                        meta["title"],
-        "description":                  meta["description"],
-        "language":                     meta["language"],
-        "doi":                          doi,
-        "upload_date":                  meta["upload_date"],
-        "download_date":                datetime.now().isoformat(),
-        "download_repository_folder":   REPO_FOLDER,
-        "download_project_folder":      project_folder,
-        "download_version_folder":      meta["version"] or None,
-        "download_method":              "API-CALL",
-        "has_qda_file":                 1 if has_qda else 0,
-        "download_complete":            1 if download_complete else 0,
-        "files":                        file_records,
-        "keywords":                     meta["keywords"],
-        "persons":                      meta["persons"],
-        "licenses":                     meta["licenses"],
+        "query_string": query_string,
+        "repository_id": REPO_ID,
+        "repository_url": REPO_URL,
+        "project_url": meta["project_url"],
+        "version": meta["version"],
+        "title": meta["title"],
+        "description": meta["description"],
+        "language": meta["language"],
+        "doi": doi,
+        "upload_date": meta["upload_date"],
+        "download_date": datetime.now().isoformat(),
+        "download_repository_folder": REPO_FOLDER,
+        "download_project_folder": project_folder,
+        "download_version_folder": meta["version"] or None,
+        "download_method": "API-CALL",
+        "files": file_records,
+        "keywords": meta["keywords"],
+        "persons": meta["persons"],
+        "licenses": meta["licenses"],
     }
 
     save_project(conn, project_data)
-    processed_dois.add(doi)  
+    processed_dois.add(doi)
+    print(f"\n  Saved to database")
     time.sleep(0.5)
 
+
 def search_zenodo(conn, query, processed_dois):
-    """Search Zenodo for a query and process all results"""
+    """
+    Search Zenodo for a query and process all results.
+
+    Args:
+        conn: Database connection
+        query: Search query string
+        processed_dois: Set of already processed DOIs
+    """
     print(f"\n{'='*60}")
     print(f"[Zenodo] Searching for '{query}'...")
     print(f"{'='*60}")
 
-    page          = 1
+    page = 1
     total_checked = 0
-    new_found     = 0
+    new_found = 0
 
     while page <= ZENODO_MAX_PAGES:
         params = {
-            "q":            query,
-            "type":         "dataset",
-            "size":         ZENODO_PAGE_SIZE,
-            "page":         page,
-            "sort":         "bestmatch",
+            "q": query,
+            "type": "dataset",
+            "size": ZENODO_PAGE_SIZE,
+            "page": page,
+            "sort": "bestmatch",
             "all_versions": "false",
         }
 
@@ -246,9 +273,9 @@ def search_zenodo(conn, query, processed_dois):
         if response is None:
             break
 
-        data    = response.json()
+        data = response.json()
         records = data.get("hits", {}).get("hits", [])
-        total   = data.get("hits", {}).get("total", 0)
+        total = data.get("hits", {}).get("total", 0)
 
         if not records:
             print(f"  No more results after page {page}")
@@ -258,13 +285,13 @@ def search_zenodo(conn, query, processed_dois):
         print(f"  Page {page}/{total_pages}: {len(records)} records (total: {total})")
 
         if page == 1 and total > 10000:
-            print(f"  ⚠️  {total} results — Zenodo limit is 10,000. "
+            print(f"  Warning: {total} results - Zenodo limit is 10,000. "
                   f"Use narrower queries for full coverage.")
 
         before = len(processed_dois)
         for record in records:
             process_record(conn, record, query, processed_dois)
-        new_found     += len(processed_dois) - before
+        new_found += len(processed_dois) - before
         total_checked += len(records)
 
         if len(records) < ZENODO_PAGE_SIZE:
@@ -274,12 +301,20 @@ def search_zenodo(conn, query, processed_dois):
         time.sleep(SLEEP_BETWEEN_PAGES)
 
     print(f"\n  Finished '{query}' on Zenodo")
-    print(f" Pages scanned:  {page}")
-    print(f" Records checked: {total_checked}")
-    print(f" New projects:  {new_found}")
+    print(f"    Pages scanned: {page}")
+    print(f"    Records checked: {total_checked}")
+    print(f"    New projects: {new_found}")
+
 
 def run_zenodo_pipeline(conn, queries, processed_dois):
-    """Run full Zenodo pipeline with all queries"""
+    """
+    Run full Zenodo pipeline with all queries.
+
+    Args:
+        conn: Database connection
+        queries: List of search queries to execute
+        processed_dois: Set of already processed DOIs
+    """
     print("\n" + "="*60)
     print("ZENODO PIPELINE (Repository ID: 1)")
     print("="*60)
@@ -290,4 +325,4 @@ def run_zenodo_pipeline(conn, queries, processed_dois):
         search_zenodo(conn, query, processed_dois)
         time.sleep(SLEEP_BETWEEN_QUERIES)
 
-    print(f"\n Zenodo pipeline complete")
+    print(f"\n  Zenodo pipeline complete")

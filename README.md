@@ -63,14 +63,12 @@ This ensures the archive prioritizes substantive qualitative research materials.
 All harvested datasets are stored in:
 
 - 📁 **Structured download directory** organized by repository and dataset ID  
-- 🗄️ **SQLite database (`qdarchive.db`)** containing:
+- 🗄️ **SQLite database (`23173040-seeding.db`)** containing:
   - Project‑level metadata  
   - File‑level metadata and download status  
   - Extracted keywords  
   - Associated persons and roles  
   - License information  
-
-📊 **CSV exports** are generated automatically for interoperability.
 
 ---
 
@@ -78,8 +76,6 @@ All harvested datasets are stored in:
 
 ### 🧭 Zenodo
 ```bash
-python pipeline.py --zenodo-extensions
-python pipeline.py --zenodo-tools
 python pipeline.py --zenodo
 ```
 
@@ -135,7 +131,6 @@ This ensures proper attribution and reproducibility.
 - 🚫 Restricted datasets (login or permission required) are **skipped automatically**  
 - 📜 All downloaded files retain their original licenses (CC‑BY, CC0, custom terms)  
 - 🧠 Users must comply with dataset‑specific licenses and citation requirements
--  
 ---
 
 ## 🙏 **Acknowledgments**

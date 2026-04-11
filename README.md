@@ -63,7 +63,7 @@ This ensures the archive prioritizes substantive qualitative research materials.
 All harvested datasets are stored in:
 
 - 📁 **Structured download directory** organized by repository and dataset ID  
-- 🗄️ **SQLite database (`23173040-seeding.db`)** containing:
+- 🗄️ **SQLite database (`23173040-sq26.db`)** containing:
   - Project‑level metadata  
   - File‑level metadata and download status  
   - Extracted keywords  

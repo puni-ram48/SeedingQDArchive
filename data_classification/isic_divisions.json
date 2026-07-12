@@ -1,0 +1,442 @@
+[
+  {
+    "code": "01",
+    "name": "Crop and animal production, hunting and related service activities",
+    "description": "Includes production of crops for human consumption, animal production, hunting, and related services. Covers agriculture, livestock, forestry and fishing activities."
+  },
+  {
+    "code": "02",
+    "name": "Forestry and logging",
+    "description": "Includes forestry activities such as logging, production of wood for fuel and charcoal, and collection of non-wood forest products."
+  },
+  {
+    "code": "03",
+    "name": "Fishing and aquaculture",
+    "description": "Includes fishing, fish farming, aquaculture production and related activities."
+  },
+  {
+    "code": "05",
+    "name": "Mining of coal and lignite",
+    "description": "Extraction of coal, lignite, and related mining activities."
+  },
+  {
+    "code": "06",
+    "name": "Extraction of crude petroleum and natural gas",
+    "description": "Extraction and processing of crude oil, natural gas, and related petroleum products."
+  },
+  {
+    "code": "07",
+    "name": "Mining of metal ores",
+    "description": "Extraction of ferrous and non-ferrous metal ores including iron, copper, precious metals."
+  },
+  {
+    "code": "08",
+    "name": "Mining of other non-metallic minerals",
+    "description": "Extraction of stones, sand, gravel, clay, salt and other non-metallic minerals."
+  },
+  {
+    "code": "09",
+    "name": "Specialized mining and quarrying services",
+    "description": "Support activities for mining and quarrying including drilling and site preparation."
+  },
+  {
+    "code": "10",
+    "name": "Manufacture of food products",
+    "description": "Production of food products including meat, dairy, grain, bakery and beverage manufacturing."
+  },
+  {
+    "code": "11",
+    "name": "Manufacture of beverages",
+    "description": "Production of beverages including alcoholic and non-alcoholic drinks."
+  },
+  {
+    "code": "12",
+    "name": "Manufacture of tobacco products",
+    "description": "Manufacturing of tobacco products and cigarettes."
+  },
+  {
+    "code": "13",
+    "name": "Manufacture of textiles",
+    "description": "Production of textiles, fabrics, yarn and thread manufacturing."
+  },
+  {
+    "code": "14",
+    "name": "Manufacture of wearing apparel",
+    "description": "Production of clothing, footwear, and accessories."
+  },
+  {
+    "code": "15",
+    "name": "Manufacture of leather and related products",
+    "description": "Tanning, dressing and processing of leather; manufacture of leather goods."
+  },
+  {
+    "code": "16",
+    "name": "Manufacture of wood and wood products",
+    "description": "Sawmilling, planing of wood, production of wooden furniture and wood products."
+  },
+  {
+    "code": "17",
+    "name": "Manufacture of paper and paper products",
+    "description": "Pulp, paper and paperboard manufacturing; production of paper products."
+  },
+  {
+    "code": "18",
+    "name": "Printing and reproduction of recorded media",
+    "description": "Printing and publishing services, reproduction of media."
+  },
+  {
+    "code": "19",
+    "name": "Manufacture of coke and refined petroleum products",
+    "description": "Refining of crude oil and production of coke and coal products."
+  },
+  {
+    "code": "20",
+    "name": "Manufacture of chemicals and chemical products",
+    "description": "Manufacturing of chemicals, pharmaceuticals, plastics and rubber products."
+  },
+  {
+    "code": "21",
+    "name": "Manufacture of basic pharmaceutical products and pharmaceutical preparations",
+    "description": "Production of basic pharmaceutical substances and medicinal preparations."
+  },
+  {
+    "code": "22",
+    "name": "Manufacture of rubber and plastic products",
+    "description": "Processing of rubber and plastic materials into finished products."
+  },
+  {
+    "code": "23",
+    "name": "Manufacture of non-metallic mineral products",
+    "description": "Production of cement, glass, ceramics and other non-metallic mineral products."
+  },
+  {
+    "code": "24",
+    "name": "Manufacture of basic metals",
+    "description": "Production of iron, steel and non-ferrous metals."
+  },
+  {
+    "code": "25",
+    "name": "Manufacture of fabricated metal products",
+    "description": "Manufacture of metal structures, fasteners, tools and other metal products."
+  },
+  {
+    "code": "26",
+    "name": "Manufacture of computer, electronic and optical products",
+    "description": "Manufacturing of computers, semiconductors, electronic and optical instruments."
+  },
+  {
+    "code": "27",
+    "name": "Manufacture of electrical machinery and apparatus",
+    "description": "Production of motors, generators, transformers and electrical equipment."
+  },
+  {
+    "code": "28",
+    "name": "Manufacture of machinery and equipment not elsewhere classified",
+    "description": "Manufacturing of general-purpose and special-purpose machinery."
+  },
+  {
+    "code": "29",
+    "name": "Manufacture of motor vehicles, trailers and semi-trailers",
+    "description": "Production of automobiles, trucks, buses and related vehicles."
+  },
+  {
+    "code": "30",
+    "name": "Manufacture of other transport equipment",
+    "description": "Production of ships, aircraft, railway equipment and other transport equipment."
+  },
+  {
+    "code": "31",
+    "name": "Manufacture of furniture",
+    "description": "Manufacturing of furniture for homes, offices and public spaces."
+  },
+  {
+    "code": "32",
+    "name": "Other manufacturing",
+    "description": "Manufacturing of jewelry, musical instruments, sports goods and other miscellaneous items."
+  },
+  {
+    "code": "33",
+    "name": "Repair and installation of machinery and equipment",
+    "description": "Specialized repair and installation services for machinery and equipment."
+  },
+  {
+    "code": "35",
+    "name": "Electricity, gas, steam and air conditioning supply",
+    "description": "Generation and supply of electricity, gas, steam and cooling services."
+  },
+  {
+    "code": "36",
+    "name": "Water collection, treatment and supply",
+    "description": "Collection, treatment and distribution of water for domestic and industrial use."
+  },
+  {
+    "code": "37",
+    "name": "Sewerage",
+    "description": "Operation of sewerage systems and wastewater treatment services."
+  },
+  {
+    "code": "38",
+    "name": "Waste collection, treatment and disposal activities",
+    "description": "Waste collection, treatment, recycling and disposal services."
+  },
+  {
+    "code": "39",
+    "name": "Remediation activities and other waste management services",
+    "description": "Site remediation and specialized waste management services."
+  },
+  {
+    "code": "41",
+    "name": "Construction of buildings",
+    "description": "Construction and development of residential and non-residential buildings."
+  },
+  {
+    "code": "42",
+    "name": "Civil engineering",
+    "description": "Construction of roads, railways, bridges, tunnels and other infrastructure."
+  },
+  {
+    "code": "43",
+    "name": "Specialized construction activities",
+    "description": "Electrical, plumbing, painting and other specialized construction services."
+  },
+  {
+    "code": "45",
+    "name": "Wholesale and retail trade and repair of motor vehicles and motorcycles",
+    "description": "Sale and repair of automobiles, motorcycles and related services."
+  },
+  {
+    "code": "46",
+    "name": "Wholesale trade, except of motor vehicles and motorcycles",
+    "description": "Wholesale distribution and trading of goods."
+  },
+  {
+    "code": "47",
+    "name": "Retail trade, except of motor vehicles and motorcycles",
+    "description": "Retail sales of goods to consumers in stores and other outlets."
+  },
+  {
+    "code": "49",
+    "name": "Land transport and transport via pipelines",
+    "description": "Passenger and freight transport by road, rail and pipeline."
+  },
+  {
+    "code": "50",
+    "name": "Water transport",
+    "description": "Passenger and freight transport by water vessels."
+  },
+  {
+    "code": "51",
+    "name": "Air transport",
+    "description": "Passenger and freight transport by aircraft."
+  },
+  {
+    "code": "52",
+    "name": "Warehousing and support activities for transportation",
+    "description": "Warehousing, cargo handling and other transport support services."
+  },
+  {
+    "code": "53",
+    "name": "Postal and courier activities",
+    "description": "Postal service operations and courier activities."
+  },
+  {
+    "code": "55",
+    "name": "Accommodation",
+    "description": "Hotels, motels, inns, guest houses and other accommodation services."
+  },
+  {
+    "code": "56",
+    "name": "Food and beverage service activities",
+    "description": "Restaurants, cafes, bars and food service operations."
+  },
+  {
+    "code": "58",
+    "name": "Publishing activities",
+    "description": "Publishing of books, journals, newspapers and electronic publications."
+  },
+  {
+    "code": "59",
+    "name": "Motion picture, video and television programme production, sound recording and music publishing activities",
+    "description": "Production of films, videos, television programs, and music publishing."
+  },
+  {
+    "code": "60",
+    "name": "Programming and broadcasting activities",
+    "description": "Radio and television broadcasting and content programming."
+  },
+  {
+    "code": "61",
+    "name": "Telecommunications",
+    "description": "Fixed and mobile telecommunications services."
+  },
+  {
+    "code": "62",
+    "name": "Computer programming, consultancy and related activities",
+    "description": "Software development, IT consulting, data processing and related services."
+  },
+  {
+    "code": "63",
+    "name": "Information service activities",
+    "description": "Information technology services, web hosting, and data management."
+  },
+  {
+    "code": "64",
+    "name": "Financial service activities, except insurance and pension funding",
+    "description": "Banking, financial intermediation and investment services."
+  },
+  {
+    "code": "65",
+    "name": "Insurance, reinsurance and pension funding, except compulsory social security",
+    "description": "Insurance and pension fund operations."
+  },
+  {
+    "code": "66",
+    "name": "Activities auxiliary to financial services and insurance activities",
+    "description": "Insurance brokerage, investment advisory and related services."
+  },
+  {
+    "code": "68",
+    "name": "Real estate activities",
+    "description": "Real estate trading, rental and related services."
+  },
+  {
+    "code": "69",
+    "name": "Legal and accounting activities",
+    "description": "Law firms, accounting services and auditing."
+  },
+  {
+    "code": "70",
+    "name": "Activities of head offices; management consultancy activities",
+    "description": "Management consulting, business strategy and headquarters services."
+  },
+  {
+    "code": "71",
+    "name": "Architectural and engineering activities; technical testing and analysis",
+    "description": "Architectural design, engineering services and technical testing."
+  },
+  {
+    "code": "72",
+    "name": "Scientific research and development",
+    "description": "Research and experimental development in sciences, engineering and social sciences."
+  },
+  {
+    "code": "73",
+    "name": "Advertising and market research",
+    "description": "Advertising, market research and public relations services."
+  },
+  {
+    "code": "74",
+    "name": "Other professional, scientific and technical activities",
+    "description": "Veterinary services, design, photographic and translation services."
+  },
+  {
+    "code": "75",
+    "name": "Veterinary activities",
+    "description": "Animal health services and veterinary practice."
+  },
+  {
+    "code": "77",
+    "name": "Rental and leasing activities",
+    "description": "Rental and leasing of machinery, equipment and other goods."
+  },
+  {
+    "code": "78",
+    "name": "Employment activities",
+    "description": "Recruitment, temporary staffing and employment services."
+  },
+  {
+    "code": "79",
+    "name": "Travel agency, tour operator and other reservation service and related activities",
+    "description": "Travel booking, tour operations and reservation services."
+  },
+  {
+    "code": "80",
+    "name": "Security and investigation activities",
+    "description": "Security services, investigation and surveillance."
+  },
+  {
+    "code": "81",
+    "name": "Services to buildings and landscape activities",
+    "description": "Building cleaning, facility management and landscaping services."
+  },
+  {
+    "code": "82",
+    "name": "Office administrative, office support and other business support activities",
+    "description": "Administrative support, call centers and office services."
+  },
+  {
+    "code": "84",
+    "name": "Public administration and defence; compulsory social security",
+    "description": "Government administration, defense and public services."
+  },
+  {
+    "code": "85",
+    "name": "Education",
+    "description": "Primary, secondary, higher and adult education services."
+  },
+  {
+    "code": "86",
+    "name": "Human health activities",
+    "description": "Hospital services, medical practice, nursing care and health services."
+  },
+  {
+    "code": "87",
+    "name": "Residential care activities",
+    "description": "Elderly care, disabled care and residential social services."
+  },
+  {
+    "code": "88",
+    "name": "Social work activities without accommodation",
+    "description": "Social assistance services, child care and counseling."
+  },
+  {
+    "code": "90",
+    "name": "Creative, arts and entertainment activities",
+    "description": "Arts, entertainment, museums, libraries and cultural activities."
+  },
+  {
+    "code": "91",
+    "name": "Libraries, archives, museums and other cultural activities",
+    "description": "Operation of cultural institutions and heritage preservation."
+  },
+  {
+    "code": "92",
+    "name": "Gambling and betting activities",
+    "description": "Casinos, betting and gaming services."
+  },
+  {
+    "code": "93",
+    "name": "Sports activities and amusement and recreation activities",
+    "description": "Sports clubs, recreation facilities and entertainment services."
+  },
+  {
+    "code": "94",
+    "name": "Activities of membership organizations",
+    "description": "Religious, political, professional and other membership organizations."
+  },
+  {
+    "code": "95",
+    "name": "Repair of computers and personal and household goods",
+    "description": "Repair and maintenance services for personal goods and electronics."
+  },
+  {
+    "code": "96",
+    "name": "Other personal service activities",
+    "description": "Laundry, hair dressing, funeral services and other personal services."
+  },
+  {
+    "code": "97",
+    "name": "Activities of households as employers; undifferentiated goods- and services-producing activities of households for own use",
+    "description": "Private household employment and domestic services."
+  },
+  {
+    "code": "98",
+    "name": "Undifferentiated goods- and services-producing activities of private households for own use",
+    "description": "Household production for own consumption."
+  },
+  {
+    "code": "99",
+    "name": "Activities of extraterritorial organisations and bodies",
+    "description": "International organizations and diplomatic missions."
+  }
+]

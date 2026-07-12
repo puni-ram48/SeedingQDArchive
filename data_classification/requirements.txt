@@ -1,0 +1,28 @@
+# ISIC Rev.5 Hybrid Classifier - Python Dependencies
+# Install all at once:
+# pip install -r requirements.txt
+
+# Core NLP & Machine Learning
+sentence-transformers>=2.2.0
+numpy>=1.21.0
+
+# PDF Text Extraction
+pypdf>=4.0.0
+pdfminer.six>=20221105
+
+# DOCX Text Extraction
+python-docx>=0.8.11
+
+# Image Processing & OCR
+pillow>=9.0.0
+pytesseract>=0.3.10
+
+# Evaluation & Visualization
+scikit-learn>=1.0.0
+matplotlib>=3.5.0
+
+# Progress bars
+tqdm>=4.65.0
+
+# Optional: GPU acceleration (NVIDIA only)
+# torch>=2.0.0

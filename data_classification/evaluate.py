@@ -1,211 +1,294 @@
 """
-Evaluation utilities for ISIC Rev.5 classification results.
+Evaluation script for ISIC Rev.5 classification results.
 
-This module computes several quality metrics for the unsupervised
-semantic classifier, including:
+Usage:
+    python evaluate.py              # evaluate ALL repositories together
+    python evaluate.py 1            # evaluate only repository_id = 1 (e.g. zenodo)
+    python evaluate.py 5            # evaluate only repository_id = 5 (e.g. DANS)
 
-1. Project–File Consistency Score
-2. Cluster Coherence (Jaccard similarity of project titles)
-3. Stability Score (project-level class appears in file-level top-3)
-4. Similarity Score Distribution (project vs file embeddings)
-5. Semantic Interpretability Examples (top titles per ISIC division)
+Metrics:
+    - Project–File Consistency Score
+    - Cluster Coherence (Jaccard similarity_score_score of project titles per class)
+    - Stability Score (file-level class stability within projects)
+    - Semantic Interpretability Examples (titles per ISIC class)
+    - Most Common Class Across All Projects (per repo)
 
-These metrics help validate the robustness, coherence, and
-interpretability of the classification pipeline.
+Assumptions:
+    - SQLite DB path and JSON path are defined in config.py:
+        DB_FILE
+        ISIC_JSON_PATH
+    - Tables:
+        projects(id, repository_id, title, primary_class)
+        file_classification(project_id, file_name, primary_class, secondary_class, similarity_score)
 """
 
+import sys
 import sqlite3
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+import json
 from collections import Counter, defaultdict
 
-# ---------------------------------------------------------------------------
-# Load project-level and file-level classification results
-# ---------------------------------------------------------------------------
-def load_results(db_path: str):
-    """Load project-level and file-level classification tables from SQLite."""
-    conn = sqlite3.connect(db_path)
+from config import DB_FILE, ISIC_JSON_PATH
 
-    projects = pd.read_sql_query(
-        """
-        SELECT id, title, primary_class, secondary_class, similarity_score
-        FROM projects
-        WHERE primary_class IS NOT NULL
-        """,
-        conn,
-    )
 
-    files = pd.read_sql_query(
-        """
-        SELECT project_id, file_name, primary_class, similarity_score
+# ---------- Utility functions ----------
+
+def load_isic_divisions(json_path: str) -> dict:
+    """Load ISIC divisions from JSON and return dict code -> (name, description)."""
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return {entry["code"]: (entry["name"], entry["description"]) for entry in data}
+
+
+def tokenize_title(title: str) -> set:
+    """Simple tokenization for Jaccard similarity_score (lowercase, split on spaces)."""
+    if not title:
+        return set()
+    return set(title.lower().split())
+
+
+def jaccard_similarity_score(a: set, b: set) -> float:
+    """Compute Jaccard similarity_score between two token sets."""
+    if not a or not b:
+        return 0.0
+    inter = a & b
+    union = a | b
+    return len(inter) / len(union)
+
+
+# ---------- Data loading ----------
+
+def load_projects(conn, repository_id=None):
+    """Load projects (optionally filtered by repository_id)."""
+    cur = conn.cursor()
+    if repository_id is None:
+        rows = cur.execute(
+            "SELECT id, repository_id, title, primary_class FROM projects"
+        ).fetchall()
+    else:
+        rows = cur.execute(
+            "SELECT id, repository_id, title, primary_class FROM projects WHERE repository_id = ?",
+            (repository_id,),
+        ).fetchall()
+
+    projects = []
+    for pid, rid, title, pclass in rows:
+        projects.append(
+            {
+                "id": pid,
+                "repository_id": rid,
+                "title": title or "",
+                "primary_class": str(pclass) if pclass is not None else None,
+            }
+        )
+    return projects
+
+
+def load_file_classifications(conn, project_ids):
+    """Load file-level classifications for given project_ids."""
+    if not project_ids:
+        return {}
+
+    cur = conn.cursor()
+    placeholders = ",".join("?" for _ in project_ids)
+    query = f"""
+        SELECT project_id, file_name, primary_class, secondary_class, similarity_score
         FROM file_classification
-        """,
-        conn,
-    )
-
-    conn.close()
-    return projects, files
-  
-# ---------------------------------------------------------------------------
-# 1. PROJECT–FILE CONSISTENCY SCORE
-# ---------------------------------------------------------------------------
-def compute_project_file_consistency(projects, files):
+        WHERE project_id IN ({placeholders})
     """
-    Measures how often the project-level ISIC class matches the majority
-    file-level ISIC class for the same project.
-    """
-    consistent = 0
-    total = 0
+    rows = cur.execute(query, project_ids).fetchall()
 
-    grouped = files.groupby("project_id")
+    by_project = defaultdict(list)
+    for pid, fname, pclass, sclass, sim in rows:
+        by_project[pid].append(
+            {
+                "file_name": fname or "",
+                "primary_class": str(pclass) if pclass is not None else None,
+                "secondary_class": str(sclass) if sclass is not None else None,
+                "similarity_score": float(sim) if sim is not None else 0.0,
+            }
+        )
+    return by_project
 
-    for _, row in projects.iterrows():
-        pid = row["id"]
-        proj_class = row["primary_class"]
 
-        if pid not in grouped.groups:
+# ---------- Metrics ----------
+
+def compute_project_file_consistency(projects, file_by_project):
+    """Project–File Consistency Score."""
+    scores = []
+
+    for proj in projects:
+        pid = proj["id"]
+        pclass = proj["primary_class"]
+        files = file_by_project.get(pid, [])
+
+        if not files or pclass is None:
             continue
 
-        file_classes = grouped.get_group(pid)["primary_class"].tolist()
-        if not file_classes:
-            continue
+        total = 0
+        match = 0
+        for f in files:
+            fclass = f["primary_class"]
+            if fclass is None:
+                continue
+            total += 1
+            if fclass == pclass:
+                match += 1
 
-        majority = Counter(file_classes).most_common(1)[0][0]
+        if total > 0:
+            scores.append(match / total)
 
-        if majority == proj_class:
-            consistent += 1
+    if not scores:
+        return 0.0
 
-        total += 1
+    return sum(scores) / len(scores)
 
-    return consistent / total if total > 0 else 0
 
-# ---------------------------------------------------------------------------
-# 2. CLUSTER COHERENCE (Jaccard similarity of project titles)
-# ---------------------------------------------------------------------------
 def compute_cluster_coherence(projects):
-    """
-    Computes average pairwise Jaccard similarity of project titles
-    within each ISIC division cluster.
-    """
-    clusters = defaultdict(list)
+    """Cluster Coherence using Jaccard similarity_score of titles."""
+    titles_by_class = defaultdict(list)
+    for proj in projects:
+        pclass = proj["primary_class"]
+        title = proj["title"]
+        if pclass is None or not title:
+            continue
+        titles_by_class[pclass].append(title)
 
-    for _, row in projects.iterrows():
-        clusters[row["primary_class"]].append(row["title"])
+    coherence = []
+    for code, titles in titles_by_class.items():
+        if len(titles) < 2:
+            continue
 
-    coherence = {}
-
-    for isic, titles in clusters.items():
+        token_sets = [tokenize_title(t) for t in titles]
         sims = []
-        tokenized = [set(t.lower().split()) for t in titles]
+        for i in range(len(token_sets)):
+            for j in range(i + 1, len(token_sets)):
+                sims.append(jaccard_similarity_score(token_sets[i], token_sets[j]))
 
-        for i in range(len(tokenized)):
-            for j in range(i + 1, len(tokenized)):
-                inter = len(tokenized[i].intersection(tokenized[j]))
-                union = len(tokenized[i].union(tokenized[j]))
-                if union > 0:
-                    sims.append(inter / union)
+        if sims:
+            coherence.append((code, sum(sims) / len(sims)))
 
-        coherence[isic] = np.mean(sims) if sims else 0.0
-
+    coherence.sort(key=lambda x: x[1], reverse=True)
     return coherence
 
-# ---------------------------------------------------------------------------
-# 3. STABILITY SCORE
-# ---------------------------------------------------------------------------
-def compute_stability_score(projects, files):
-    """
-    Measures how often the project-level ISIC class appears in the
-    top-3 most frequent file-level classes for the same project.
-    """
-    stable = 0
-    total = 0
 
-    grouped = files.groupby("project_id")
+def compute_stability_score(projects, file_by_project):
+    """Stability Score: max fraction of files in any single class."""
+    stabilities = []
 
-    for _, row in projects.iterrows():
-        pid = row["id"]
-        proj_class = row["primary_class"]
-
-        if pid not in grouped.groups:
+    for proj in projects:
+        pid = proj["id"]
+        files = file_by_project.get(pid, [])
+        if not files:
             continue
 
-        file_classes = grouped.get_group(pid)["primary_class"].tolist()
-        top3 = [c for c, _ in Counter(file_classes).most_common(3)]
+        classes = [f["primary_class"] for f in files if f["primary_class"] is not None]
+        if not classes:
+            continue
 
-        if proj_class in top3:
-            stable += 1
+        counts = Counter(classes)
+        total = sum(counts.values())
+        max_frac = max(counts.values()) / total
+        stabilities.append(max_frac)
 
-        total += 1
+    if not stabilities:
+        return 0.0
 
-    return stable / total if total > 0 else 0
+    return sum(stabilities) / len(stabilities)
 
-# ---------------------------------------------------------------------------
-# 4. SIMILARITY SCORE DISTRIBUTION
-# ---------------------------------------------------------------------------
-def plot_similarity_distribution(projects, files):
-    """
-    Plots histogram distributions of similarity scores for project-level
-    and file-level embeddings.
-    """
-    plt.figure(figsize=(10, 5))
-    plt.hist(projects["similarity_score"], bins=30, alpha=0.6, label="Project-level")
-    plt.hist(files["similarity_score"], bins=30, alpha=0.6, label="File-level")
-    plt.legend()
-    plt.title("Similarity Score Distribution")
-    plt.xlabel("Similarity")
-    plt.ylabel("Frequency")
-    plt.grid(alpha=0.3)
-    plt.show()
-  
-# ---------------------------------------------------------------------------
-# 5. SEMANTIC INTERPRETABILITY EXAMPLES
-# ---------------------------------------------------------------------------
-def print_cluster_examples(projects, top_n=5):
-    """
-    Prints example project titles for each ISIC division to help assess
-    semantic interpretability of clusters.
-    """
-    clusters = defaultdict(list)
 
-    for _, row in projects.iterrows():
-        clusters[row["primary_class"]].append(row["title"])
+def collect_semantic_examples(projects, top_n=10, per_class=5):
+    """Semantic Interpretability Examples."""
+    class_counts = Counter()
+    titles_by_class = defaultdict(list)
 
-    print("\nSemantic Interpretability Examples:")
-    for isic, titles in clusters.items():
-        print(f"\nISIC {isic}:")
-        for t in titles[:top_n]:
+    for proj in projects:
+        pclass = proj["primary_class"]
+        title = proj["title"]
+        if pclass is None or not title:
+            continue
+        class_counts[pclass] += 1
+        titles_by_class[pclass].append(title)
+
+    top_classes = [code for code, _ in class_counts.most_common(top_n)]
+    examples = {}
+    for code in top_classes:
+        examples[code] = titles_by_class[code][:per_class]
+
+    return examples
+
+
+# ---------- Main ----------
+
+def main():
+    # Parse optional repository_id argument
+    repository_id = None
+    if len(sys.argv) > 1:
+        try:
+            repository_id = int(sys.argv[1])
+        except ValueError:
+            print("Invalid repository_id argument. Use an integer (e.g., 1 or 5).")
+            sys.exit(1)
+
+    # Load ISIC divisions
+    isic_info = load_isic_divisions(ISIC_JSON_PATH)
+
+    # Connect to DB
+    conn = sqlite3.connect(DB_FILE)
+
+    # Load projects (optionally filtered by repository_id)
+    projects = load_projects(conn, repository_id=repository_id)
+    if not projects:
+        print(f"No projects found for repository_id = {repository_id}.")
+        conn.close()
+        return
+
+    project_ids = [p["id"] for p in projects]
+
+    # Load file-level classifications
+    file_by_project = load_file_classifications(conn, project_ids)
+
+    # ---------- Compute metrics ----------
+
+    # 1. Project–File Consistency
+    consistency = compute_project_file_consistency(projects, file_by_project)
+    print(f"Project–File Consistency Score: {consistency:.3f}\n")
+
+    # 2. Cluster Coherence
+    coherence = compute_cluster_coherence(projects)
+    print("Cluster Coherence (Jaccard similarity_score of titles):")
+    for code, score in coherence[:10]:
+        name = isic_info.get(code, ("Unknown", ""))[0]
+        print(f"ISIC {code} ({name}): {score:.3f}")
+    print()
+
+    # 3. Stability Score
+    stability = compute_stability_score(projects, file_by_project)
+    print(f"Stability Score: {stability:.3f}\n")
+
+    # 4. Semantic Interpretability Examples
+    examples = collect_semantic_examples(projects, top_n=10, per_class=5)
+    print("Semantic Interpretability Examples:\n")
+    for code, titles in examples.items():
+        name, desc = isic_info.get(code, ("Unknown", ""))
+        print(f"ISIC {code} ({name}):")
+        for t in titles:
             print(f"  - {t}")
-          
-# ---------------------------------------------------------------------------
-# MAIN EXECUTION (optional)
-# ---------------------------------------------------------------------------
+        print()
+
+    # 5. Most common class across all projects (per repo)
+    class_counts = Counter([p["primary_class"] for p in projects if p["primary_class"]])
+    if class_counts:
+        dominant_class, count = class_counts.most_common(1)[0]
+        name, desc = isic_info.get(dominant_class, ("Unknown", ""))
+        print("Most Common Class Across All Projects:")
+        print(f"  ISIC {dominant_class} – {name}")
+        print(f"  Description: {desc}")
+        print(f"  Count: {count}\n")
+    else:
+        print("Most Common Class Across All Projects: No classes found.\n")
+
+    conn.close()
+
+
 if __name__ == "__main__":
-  """
-    DB_FILE:
-      SQLite database generated by the data_acquisition step.
-      Contains project metadata, file metadata, and download status.
-    """
-    DB_PATH = r"23173040-sq26.db"
-
-    projects, files = load_results(DB_PATH)
-
-    # 1. Consistency
-    consistency = compute_project_file_consistency(projects, files)
-    print(f"Project–File Consistency Score: {consistency:.3f}")
-
-    # 2. Coherence
-    coherence_scores = compute_cluster_coherence(projects)
-    print("\nCluster Coherence (Jaccard similarity of titles):")
-    for isic, score in sorted(coherence_scores.items(), key=lambda x: -x[1])[:10]:
-        print(f"ISIC {isic}: {score:.3f}")
-
-    # 3. Stability
-    stability = compute_stability_score(projects, files)
-    print(f"\nStability Score: {stability:.3f}")
-
-    # 4. Similarity distribution
-    plot_similarity_distribution(projects, files)
-
-    # 5. Interpretability examples
-    print_cluster_examples(projects)
+    main()

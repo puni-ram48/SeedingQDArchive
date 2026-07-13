@@ -42,6 +42,7 @@ data_acquisition/
 ├── dans.py                    ← DANS harvester (all 5 stations)
 ├── database.py                ← SQLite schema + insert logic
 ├── pipeline.py                ← Orchestrator
+├── requirements.txt
 └── downloads/                 ← All harvested datasets
 ```
 

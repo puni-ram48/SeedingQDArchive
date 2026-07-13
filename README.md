@@ -15,117 +15,27 @@ The pipeline maintains a structured **SQLite data model**, facilitating reproduc
 
 ---
 
-## ⚙️ **2. System Overview**
+## 🧠 **2. Data Acquisition Logic**
 
-The pipeline is composed of highly modular components divided across the two functional phases:
+Every discovered dataset is filtered through a strict, automated evaluation process to ensure only relevant qualitative materials are archived:
 
-### 📥 **Phase 1: Acquisition Components**
-
-* **Configuration Layer (`data_acquisition/config.py`):** Defines repository API endpoints, authentication tokens, pagination controls, file-type lists, and multilingual query strings.
-* **Utility Layer (`data_acquisition/utils.py`):** Houses shared mechanics for rate-limit management, parallel download threads, retry logic, and fallback language identification.
-* **Database Layer (`data_acquisition/database.py`):** Implements the relational schema (`PROJECTS`, `FILES`, `KEYWORDS`, `PERSON_ROLE`, `LICENSES`) following the required output format specifications.
-* **Repository Harvesters (`zenodo.py`, `dans.py`):** Domain-specific harvesters that interact with the Zenodo REST API and Dataverse API to discover, filter, and extract targets.
-* **Acquisition Orchestrator (`data_acquisition/pipeline.py`):** Coordinates search queries, monitors process state, and prevents redundant downloads.
-
-### 🧠 **Phase 2: Classification Components**
-
-* **Configuration Layer (`data_classification/config.py`):** Configures embedding model targets, threshold filters, and paths to taxonomic reference materials.
-* **Type Classifier (`data_classification/project_type.py`):** Evaluates the presence of qualitative materials to tag projects with operational categories (`QDA_PROJECT`, `QD_PROJECT`, or `OTHER`).
-* **Embedding Utility (`data_classification/embedder.py`):** Interfaces with the `multilingual-e5-large` encoder model to calculate normalized, high-dimensional vector representations.
-* **Feature Extractor (`data_classification/extractor.py`):** Safely parses and extracts structural textual preview data from document files (such as `.pdf` and `.docx`).
-* **Context Builder (`data_classification/project_text.py`):** Synthesizes structural metadata (title, keywords, description) and extracted textual previews into unified documents for encoding.
-* **Taxonomic Classifier (`data_classification/classifier.py`):** Executes semantic zero-shot matching using cosine-similarity calculations across ~80 distinct economic divisions of the ISIC Rev.5 taxonomy.
-* **Diagnostic Evaluator (`data_classification/evaluate.py`):** Computes diagnostic telemetry on model classifications, outputting performance and consistency metrics.
+* **QDA Container Detection:** Instantly downloads the entire dataset if native qualitative software files (such as NVivo, ATLAS.ti, or MaxQDA formats) are detected.
+* **Irrelevance Filtering:** Automatically bypasses and excludes datasets that contain purely quantitative, spatial, or non-qualitative formats.
+* **Qualitative Indicator Scan:** Scans metadata for explicit qualitative indicators (such as references to transcripts, interviews, or field notes) to trigger downloads of supporting text files.
+* **Default Exclusion:** Rejects and skips any dataset that fails to meet either the software container or qualitative indicator criteria.
 
 ---
 
-## 🧠 **3. Data Acquisition Logic**
+## 🏷️ **3. Data Classification Logic**
 
-Each dataset discovered during repository querying is evaluated using a rigorous four-step decision framework:
+Once datasets are saved, the system automatically indexes and semantically categorizes them:
 
-```
-                  [ Discovered Dataset ]
-                            │
-                            ▼
-             / \  Yes
-            /   \ ─────────────────► [ Download All Files ]
-            \ QDA? /                 (NVivo, ATLAS.ti, MaxQDA)
-             \   /
-              \ /
-               │ No
-               ▼
-             / \  Yes
-            /   \ ─────────────────► [ Skip / Exclude Dataset ]
-            \ Irrel?/                (Non-qualitative formats)
-             \   /
-              \ /
-               │ No
-               ▼
-             / \  Yes
-            / Qual\ ────────────────► [ Download Supporting Files ]
-            \ Indic?/                (Transcripts, text surveys, notes)
-             \   /
-              \ /
-               │ No
-               ▼
-       [ Skip / Exclude ]
+* **Operational Categorization:** Groups datasets into functional categories based on their contents—either as dedicated software projects, raw qualitative text collections, or unrelated non-qualitative data.
+* **Taxonomic Reference Mapping:** Converts the official descriptions of the ISIC Rev.5 economic sectors into dense mathematical reference vectors.
+* **Semantic Similarity Matching:** Merges dataset metadata and extracted file text into a unified narrative, matching it against the reference vectors to assign primary and secondary economic classifications.
+* **Hierarchical Propagation:** Applies the resulting classification scores from the top project level down to individual files to map sub-topics within complex datasets.
 
-```
-
-This tiered evaluation ensures the local archive prioritizes substantive, operational qualitative materials.
-
----
-
-## 🏷️ **4. Data Classification Logic**
-
-Once datasets are written to the database, they undergo semantic categorization:
-
-1. **Operational Categorization:** Projects are analyzed to determine their functional research type:
-* `QDA_PROJECT`: Contains native qualitative analysis software project files.
-* `QD_PROJECT`: Lacks dedicated QDA project containers but contains substantial raw qualitative text structures (transcripts, surveys, interview reports).
-* `OTHER`: Standard datasets containing unrelated numerical, spatial, or audio-visual data.
-
-
-2. **Taxonomic Target Precomputation:** The system ingests the ISIC Rev.5 JSON definitions, mapping textual descriptions of all ~80 economic divisions into dense embedding vectors.
-3. **Compound Project Representation:** To maximize accuracy across multiple languages, the system constructs a cohesive narrative representation for each project, combining title, user-provided tags, descriptions, and structural content previews extracted from within the actual dataset files.
-4. **Vector Embedding Search:** The compound project text is encoded with `multilingual-e5-large`. The system calculates cosine-similarity scores against the precomputed ISIC taxonomy vectors, mapping the primary and secondary economic classes to the database along with confidence scores.
-5. **Hierarchical Back-propagation:** The classification propagates down to the file level. For critical qualitative files, individual embeddings are evaluated to track sub-topic distribution within complex, multi-file projects.
-
----
-
-## 📂 **5. Output & Database Structure**
-
-The pipeline outputs are designed to exist in a clean, self-documenting footprint:
-
-### 📁 **Structured Download Tree**
-
-```bash
-downloads/
-├── zenodo/
-│   └── <project_id>/
-│       ├── file1.pdf
-│       ├── file2.docx
-│       └── metadata.json
-└── dans/
-    └── <station_name>/
-        └── <project_id>/
-            └── (files)
-
-```
-
-### 🗃️ **Normalized SQLite Schema (`qdarchive.db`)**
-
-The relational database tracks acquisitions and classifications using five core tables:
-
-* **`PROJECTS`:** Core metadata table containing unique identifier fields (`id`, `title`, `description`, `language`, `doi`), functional assignment (`type`), the directory paths, and the semantic classification outcomes (`primary_class`, `secondary_class`, `similarity_score`).
-* **`FILES`:** File-level tracking sheet mapping to `PROJECTS` containing name, detected type, download status, structural preview text, and individual file-level classification labels.
-* **`KEYWORDS`:** Project-level metadata keywords parsed from source repository tags.
-* **`PERSON_ROLE`:** Authors, contributors, and organizational curators associated with the submission.
-* **`LICENSES`:** Terms of use parsed directly from the repositories.
-
----
-
-## 🖥️ **6. Running the Pipeline**
+## 🖥️ **4. Running the Pipeline**
 
 ### **Part 1: Harvesting & Database Seeding**
 
@@ -165,9 +75,7 @@ python evaluate.py
 
 ---
 
-## 📊 **7. Diagnostic Evaluation & Limitations**
-
-### **Quality Metrics**
+## 📊 **5. Evaluation Quality Metrics**
 
 The classification pipeline monitors output quality using three main metrics:
 
@@ -175,15 +83,9 @@ The classification pipeline monitors output quality using three main metrics:
 * **Coherence Score:** Calculates semantic similarity between the project-level assignment and independent classifications calculated for its constituent files.
 * **Classification Consistency:** Evaluates taxonomic alignment across multi-language equivalents of the same project context.
 
-### **Limitations & Considerations**
-
-* **Zero-Shot Embedding vs. Supervised Methods:** This pipeline utilizes a highly flexible zero-shot vector similarity matching approach, allowing it to easily accommodate future changes to taxonomic structures (such as moving from ISIC Rev.5 to a different standard). However, when compared to **supervised methods**, zero-shot classification can display lower precision in highly specialized or niche domains. If large, hand-labeled datasets are available, **supervised methods** should be trained to achieve higher categorical precision for stable, unchanging taxonomies.
-* **QDA Container Enclosures:** Detailed textual content trapped inside specialized, proprietary, or password-protected QDA project file formats cannot be automatically parsed due to licensing and structural constraints. The system falls back to external metadata and accompanying text files in these scenarios.
-* **Maximum File Size Constraints:** A hard limit of 100 MB per file is applied to prevent network timeouts and local storage exhaustion.
-
 ---
 
-## 🗃️ **8. Data Sources & Citation**
+## 🗃️ **6. Data Sources & Citation**
 
 QDArchive harvests publicly available research datasets from open-science infrastructures:
 
@@ -213,7 +115,7 @@ Every dataset harvested by QDArchive includes its own DOI and license informatio
 
 ---
 
-## ⚖️ **9. Ethical & Legal Considerations**
+## ⚖️ **7. Ethical & Legal Considerations**
 
 * **Public Access Only:** The pipeline exclusively targets publicly accessible records. Restricted-access datasets requiring specific authorization are skipped automatically.
 * **License Maintenance:** Original licenses (CC-BY, CC0, and other open-source arrangements) are captured alongside file payloads to ensure downstream compliance.

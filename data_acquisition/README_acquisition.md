@@ -1,4 +1,4 @@
-# 📘 SeedingQDArchive — Part 1: Data Acquisition Pipeline  
+# 📘 Part 1: Data Acquisition Pipeline  
 *A multilingual, modular scraper for harvesting qualitative research datasets from Zenodo and DANS.*
 
 ---

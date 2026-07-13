@@ -1,6 +1,41 @@
 # 📘 **SeedingQDArchive: Automated Pipeline for Harvesting Qualitative Research Datasets**
 
----
+    %% PART 1: DATA ACQUISITION
+    A[Start] --> B[Part 1: Data Acquisition]
+
+    B --> C[Zenodo Harvester\npipeline.py --zenodo]
+    B --> D[DANS Harvester\npipeline.py --dans]
+
+    C --> E[Download datasets]
+    D --> E[Download datasets]
+
+    E --> F[Extract metadata\n(projects, files, keywords, persons, licenses)]
+    F --> G[Store in SQLite DB\nqdarchive.db]
+
+    %% PART 2: PROJECT TYPE ASSIGNMENT
+    G --> H[Part 2: Project Type Assignment\nproject_type.py]
+    H --> I[Assign project types:\nQDA_PROJECT, QD_PROJECT,\nOTHER_PROJECT, UNKNOWN]
+
+    %% PART 2: CLASSIFICATION
+    I --> J[Run ISIC Classification\nrun_classification.py]
+
+    J --> K[Build project-level text\n(project_text.py)]
+    K --> L[Extract file text\n(extractor.py)]
+    L --> M[Generate embeddings\n(multilingual-e5-large)]
+    M --> N[Zero-shot ISIC Rev.5 ranking\n(classifier.py)]
+    N --> O[Update DB with:\nprimary_class,\nsecondary_class,\nsimilarity_score]
+
+    %% FILE-LEVEL CLASSIFICATION
+    O --> P[Classify primary files\n(classify_primary_files)]
+    P --> Q[Store file-level classes\n(file_classification table)]
+
+    %% PART 2: EVALUATION
+    Q --> R[Evaluate Results\nevaluate.py]
+
+    R --> S[Compute Metrics:\n• Project–File Consistency\n• Stability Score\n• Cluster Coherence\n• Semantic Examples]
+
+    S --> T[End]
+
 
 ## 🌍 **1. Introduction**
 QDArchive is an automated data‑acquisition pipeline designed to identify, retrieve, and archive **qualitative research datasets** from two major open repositories:  

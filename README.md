@@ -4,6 +4,8 @@
 
 QDArchive is an end-to-end pipeline designed to identify, retrieve, classify, and semantically organize **qualitative research datasets** from major open repositories.
 
+<img src="Flowchart.png" width="800" height="466">
+
 The pipeline operates in two distinct phases:
 
 1. **Acquisition:** Automatically harvests and filters datasets from **Zenodo** and **DANS Data Stations (Dataverse)**, identifying qualitative project files (NVivo, ATLAS.ti, MaxQDA, REFI-QDA) and textual materials (interviews, transcripts, field notes) across multiple languages.
